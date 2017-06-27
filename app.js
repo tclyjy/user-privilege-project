@@ -11,7 +11,7 @@ app.use(cors());
 router.post('/user/register', koaBody, routes.userRegister);
 router.options('/user/register', koaBody, routes.userRegister);
 router.post('/user/login', koaBody, routes.userLogin);
-router.get('/testToken', koaBody, routes.testToken);
+router.get('/checkToken', koaBody, routes.checkToken);
 
 app.use(router.routes())
   .use(router.allowedMethods());

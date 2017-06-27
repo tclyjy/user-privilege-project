@@ -109,25 +109,34 @@ exports.userLogin = function (ctx, next) {
   })
 }
 
-exports.testToken = function (ctx, next) {
-  var data = url.parse(ctx.request.url, true).query;
+exports.checkToken = function (ctx, next) {
+  return new Promise(function (resolve, reject) {
+    var data = url.parse(ctx.request.url, true).query;
 
-  Token.checkToken(data.token).then(function (code) {
-    console.log(code);
+    Token.checkToken(data.token).then(function (code) {
+      console.log(code);
 
-    if (code.code === '0') {
-      let response = {
-        'code': '0',
-        'msg': 'token已过期'
+      if (code.code === '0') {
+        let response = {
+          'code': '0',
+          'msg': 'token已过期'
+        }
+        ctx.body = response;
+        resolve(next());
+      } else {
+        // 获取权限
+        Privileges.findPrivileges(code.roleId, code.userId).then(function (privileges) {
+
+          let response = {
+            'code': '1',
+            'msg': '验证成功',
+            'role': code.role,
+            'privileges': privileges
+          }
+          ctx.body = response;
+          resolve(next());
+        });
       }
-      ctx.body = response;
-    } else {
-      let response = {
-        'code': '1',
-        'msg': '验证成功',
-        'data': code
-      }
-      ctx.body = response;
-    }
+    })
   })
 }
