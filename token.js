@@ -1,13 +1,18 @@
 const jwt = require("jsonwebtoken");
 const co = require('co');
 const Role = require('./role.js');
+const Privileges = require('./privilege.js');
 
-exports.getToken = function (Userid, userName) {
+exports.getToken = function (userId) {
   return co(function* () {
-    var role = yield Role.findUserRole(Userid);
+    // 获得 角色信息
+    var role = yield Role.findUserRole(userId);
+    // 获得 角色权限信息
+    // var privileges = yield Privileges.findPrivileges(role[0]._id, userId);
 
     let content = {
-      userName: userName,
+      userId: userId,
+      roleId: role[0]._id,
       role: role[0].name
     } // 要生成token的主题信息
 
@@ -28,7 +33,6 @@ exports.checkToken = function (token) {
     try {
 
       var result = jwt.verify(token, secretOrPrivateKey);
-
       let msg = Object.assign({
         code: '1'
       }, result);

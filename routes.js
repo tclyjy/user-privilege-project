@@ -3,13 +3,13 @@ const url = require('url');
 const db = require('./db/model.js');
 const Role = require('./role.js');
 const Token = require('./token.js');
+const Privileges = require('./privilege.js');
 
 exports.userRegister = function (ctx, next) {
   return new Promise(function (resolve, reject) { // 这行非常关键，文档没有，异步数据必须创建Promise否则 ctx.body无法挂载
 
     // 获取post请求传递过来的数据
     let body = ctx.request.body;
-
     // 将userName，passWord进行md5加密
     let userName = crypto.createHash('md5').update(body.userName).digest('hex');
     let passWord = crypto.createHash('md5').update(body.userPwd).digest('hex');
@@ -54,6 +54,7 @@ exports.userLogin = function (ctx, next) {
     console.log(ctx.request.header.authorization);
     let userName = body.userName;
     let passWord = body.userPwd;
+
     db.find('userInfo', {
       'userName': userName
     }).then(function (result) {
@@ -66,19 +67,25 @@ exports.userLogin = function (ctx, next) {
             'loginTime': Date()
           }).then(function () {
             // 获取Token
-            Token.getToken(result[0]._id, userName).then(function (result) {
+            Token.getToken(result[0]._id).then(function (result) {
 
               // 获取该用户角色
               Token.checkToken(result).then(function (code) {
-                console.log(code);
-                let response = {
-                  'code': '1',
-                  'msg': '验证成功',
-                  'role': code.role,
-                  'token': result
-                }
-                ctx.body = response;
-                resolve(next());
+
+                // 获取权限
+                Privileges.findPrivileges(code.roleId, code.userId).then(function (privileges) {
+
+                  let response = {
+                    'code': '1',
+                    'msg': '验证成功',
+                    'role': code.role,
+                    'privileges': privileges,
+                    'token': result,
+                    'tokenExp': code.exp
+                  }
+                  ctx.body = response;
+                  resolve(next());
+                });
               })
             })
           })
