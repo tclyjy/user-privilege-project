@@ -12,6 +12,7 @@ router.post('/user/register', koaBody, routes.userRegister);
 router.options('/user/register', koaBody, routes.userRegister);
 router.post('/user/login', koaBody, routes.userLogin);
 router.get('/checkToken', koaBody, routes.checkToken);
+router.get('/getPrivilege', koaBody, routes.getPrivilege);
 
 app.use(router.routes())
   .use(router.allowedMethods());

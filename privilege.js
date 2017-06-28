@@ -29,3 +29,9 @@ exports.findPrivileges = function (roleId, userId) {
     return yield Promise.resolve(result);
   })
 }
+exports.getPrivileges = function () {
+  return co(function* () {
+    var result = yield db.find('privilege', {});
+    return yield Promise.resolve(result);
+  })
+}

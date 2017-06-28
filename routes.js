@@ -4,10 +4,11 @@ const db = require('./db/model.js');
 const Role = require('./role.js');
 const Token = require('./token.js');
 const Privileges = require('./privilege.js');
+const co = require('co');
 
 exports.userRegister = function (ctx, next) {
-  return new Promise(function (resolve, reject) { // 这行非常关键，文档没有，异步数据必须创建Promise否则 ctx.body无法挂载
 
+  return co(function* () {
     // 获取post请求传递过来的数据
     let body = ctx.request.body;
     // 将userName，passWord进行md5加密
@@ -15,128 +16,159 @@ exports.userRegister = function (ctx, next) {
     let passWord = crypto.createHash('md5').update(body.userPwd).digest('hex');
 
     // 数据库查找是否用户名重合
-    db.find('userInfo', {
+    let result = yield db.find('userInfo', {
       'userName': userName
-    }).then(function (result) {
-      if (result.length > 0) {
-        var response = {
-          'code': '0',
-          'msg': '用户名已存在'
-        }
-        ctx.body = response;
-        resolve(next());
-      } else {
-        db.insert('userInfo', {
-          'userName': userName,
-          'userPwd': passWord,
-          registerTime: Date()
-        }).then(function (result) {
-
-          // 默认绑定普通用户角色
-          Role.setUserRole(result.insertedId, 'consumer').then(function () {
-            var response = {
-              'code': '1',
-              'msg': '注册成功',
-              'role': 'consumer'
-            }
-            ctx.body = response;
-            resolve(next());
-          })
-        })
-      }
     })
+
+    if (result.length > 0) {
+      let response = {
+        'code': '0',
+        'msg': '用户名已存在'
+      }
+      ctx.body = response;
+    } else {
+      let result = yield db.insert('userInfo', {
+        'userName': userName,
+        'userPwd': passWord,
+        registerTime: Date()
+      })
+
+      // 默认绑定普通用户角色
+      yield Role.setUserRole(result.insertedId, 'consumer');
+
+      let response = {
+        'code': '1',
+        'msg': '注册成功',
+        'role': 'consumer'
+      }
+      ctx.body = response;
+    }
   })
 }
 
 exports.userLogin = function (ctx, next) {
-  return new Promise(function (resolve, reject) {
+  return co(function* () {
     let body = ctx.request.body;
     console.log(ctx.request.header.authorization);
     let userName = body.userName;
     let passWord = body.userPwd;
-
-    db.find('userInfo', {
+    let result = yield db.find('userInfo', {
       'userName': userName
-    }).then(function (result) {
-      if (result.length == 1) {
-        console.log(result[0].loginTime);
-        if (result[0].userPwd === passWord) {
-          db.update('userInfo', {
-            'userName': userName
-          }, {
-            'loginTime': Date()
-          }).then(function () {
-            // 获取Token
-            Token.getToken(result[0]._id).then(function (result) {
-
-              // 获取该用户角色
-              Token.checkToken(result).then(function (code) {
-
-                // 获取权限
-                Privileges.findPrivileges(code.roleId, code.userId).then(function (privileges) {
-
-                  let response = {
-                    'code': '1',
-                    'msg': '验证成功',
-                    'role': code.role,
-                    'privileges': privileges,
-                    'token': result,
-                    'tokenExp': code.exp
-                  }
-                  ctx.body = response;
-                  resolve(next());
-                });
-              })
-            })
-          })
-        } else {
-          var response = {
-            'code': '0',
-            'msg': '您输入的用户名、密码有误'
-          }
-          ctx.body = response;
-          resolve(next());
-        }
-      } else {
-        var response = {
-          'code': '0',
-          'msg': '您输入的用户名、密码有误'
-        }
+    });
+    if (result.length == 1) {
+      if (result[0].userPwd === passWord) {
+        yield db.update('userInfo', {
+          'userName': userName
+        }, {
+          'loginTime': Date()
+        })
+        let tokenResult = yield Token.getToken(result[0]._id);
+        let code = yield Token.checkToken(tokenResult);
+        let privileges = yield Privileges.findPrivileges(code.roleId, code.userId);
+        let response = {
+          'code': '1',
+          'msg': '验证成功',
+          'role': code.role,
+          'privileges': privileges,
+          'token': tokenResult,
+          'tokenExp': code.exp
+        };
         ctx.body = response;
-        resolve(next());
-      }
-    })
-  })
-}
+      };
+    } else {
+      var response = {
+        'code': '0',
+        'msg': '您输入的用户名、密码有误'
+      };
+      ctx.body = response;
+    };
+  });
+};
 
 exports.checkToken = function (ctx, next) {
-  return new Promise(function (resolve, reject) {
-    var data = url.parse(ctx.request.url, true).query;
+  return co(function* () {
+    let data = url.parse(ctx.request.url, true).query;
+    let code = yield Token.checkToken(data.token);
+    if (code.code === '0') {
+      let response = {
+        'code': '0',
+        'msg': 'token已过期'
+      };
+      ctx.body = response;
+    } else {
+      let privileges = yield Privileges.findPrivileges(code.roleId, code.userId);
+      let response = {
+        'code': '1',
+        'msg': '验证成功',
+        'role': code.role,
+        'privileges': privileges
+      };
+      ctx.body = response;
+      return
+    };
+  });
+};
 
-    Token.checkToken(data.token).then(function (code) {
-      console.log(code);
+exports.getPrivilege = function (ctx, next) {
+  return co(function* () {
+    let data = url.parse(ctx.request.url, true).query;
 
-      if (code.code === '0') {
-        let response = {
-          'code': '0',
-          'msg': 'token已过期'
+    let response = yield checkToken(data.token);
+
+    if (response === '0') {
+      let response = {
+        'code': '0',
+        'msg': 'token已过期'
+      };
+      ctx.body = response;
+    } else if (response === '2') {
+      let response = {
+        'code': '3',
+        'msg': '该账户不具备该功能权限'
+      };
+      ctx.body = response;
+    } else {
+      let privileges = yield Privileges.getPrivileges();
+      let response = {
+        'code': '1',
+        'msg': '验证成功',
+        'privileges': privileges
+      };
+      ctx.body = response;
+    };
+  });
+};
+
+
+/* 封装的方法 */
+function contains(arr, name) {
+  var i = arr.length;
+  while (i--) {
+    if (arr[i].name === name) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function checkToken(token) {
+  return co(function* () {
+    let code = yield Token.checkToken(token);
+    if (code.code === '0') {
+      let response = '0';
+      return response;
+    } else {
+      // 获取权限
+      let privileges = yield Privileges.findPrivileges(code.roleId, code.userId).then(function (privileges) {
+
+        if (contains(privileges, 'USER_CONTROL_READ')) {
+          let response = '1';
+          return response;
+        } else {
+          let response = '2';
+          return response;
         }
-        ctx.body = response;
-        resolve(next());
-      } else {
-        // 获取权限
-        Privileges.findPrivileges(code.roleId, code.userId).then(function (privileges) {
-
-          let response = {
-            'code': '1',
-            'msg': '验证成功',
-            'role': code.role,
-            'privileges': privileges
-          }
-          ctx.body = response;
-          resolve(next());
-        });
-      }
-    })
+      });
+    }
   })
 }
