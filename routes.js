@@ -5,6 +5,7 @@ const Role = require('./role.js');
 const Token = require('./token.js');
 const Privileges = require('./privilege.js');
 const co = require('co');
+const mongoose = require('mongoose');
 
 exports.userRegister = function (ctx, next) {
 
@@ -49,7 +50,7 @@ exports.userRegister = function (ctx, next) {
 exports.userLogin = function (ctx, next) {
   return co(function* () {
     let body = ctx.request.body;
-    console.log(ctx.request.header.authorization);
+
     let userName = body.userName;
     let passWord = body.userPwd;
     let result = yield db.find('userInfo', {
@@ -84,7 +85,19 @@ exports.userLogin = function (ctx, next) {
     };
   });
 };
+exports.userLogout = function (ctx, next) {
+  return co(function* () {
+    console.log('getToken' + ctx.request.header.authorization);
+    yield db.insert('logoutToken', {
+      'createdAt': new Date(),
+      'token': ctx.request.header.authorization
+    })
+    var a = yield db.expire('logoutToken', 60)
+    console.log(a);
 
+    ctx.body = '成功';
+  });
+}
 exports.checkToken = function (ctx, next) {
   return co(function* () {
     let data = url.parse(ctx.request.url, true).query;
@@ -111,6 +124,7 @@ exports.checkToken = function (ctx, next) {
 
 exports.getPrivilege = function (ctx, next) {
   return co(function* () {
+
     let data = url.parse(ctx.request.url, true).query;
 
     let response = yield checkToken(data.token);
@@ -138,6 +152,34 @@ exports.getPrivilege = function (ctx, next) {
     };
   });
 };
+
+exports.getUserList = function (ctx, next) {
+  return co(function* () {
+    let code = yield Token.checkToken(ctx.request.header.authorization);
+    console.log(code);
+    let result = yield db.find('userForPrivilege', {
+      'userId': code.userId
+    })
+    let privilege = result.privileges
+
+    if (code.role === 'superAdmin' || code.role === 'admin' || privilege.indexOf(ObjectId('5951fba066b349068ecc23fd')) >= 0) {
+      let result = yield db.find('userInfo', {})
+      for (let i = 0; i < result.length; i++) {
+        let userObjectId = mongoose.Types.ObjectId(result[i]._id);
+        delete result[0].userName
+        delete result[0].userPwd
+        let userForRole = yield db.find('userForRole', {
+          'userId': userObjectId
+        })
+        let role = yield db.find('role', {
+          _id: userForRole[0].roleId
+        })
+        result[i].role = role[0].name
+      }
+      ctx.body = result;
+    }
+  })
+}
 
 
 /* 封装的方法 */

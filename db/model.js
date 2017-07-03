@@ -65,3 +65,27 @@ exports.update = function (collection, option, set) {
     return yield Promise.resolve(docs);
   });
 }
+/**
+ * 过期自动删除
+ */
+exports.expire = function (collection, time) {
+  return co(function* () {
+    var db = yield MongoClient.connect('mongodb://111.230.129.242:27017/user');
+
+    var adminDb = db.admin();
+
+    var result = yield adminDb.authenticate('root', 'yjy920605');
+    test.ok(result);
+
+    var Collection = db.collection(collection);
+
+    var docs = yield Collection.createIndex({
+      createtime: 1
+    }, {
+      expireAfterSeconds: time
+    });
+    db.close();
+
+    return yield Promise.resolve(docs);
+  })
+}

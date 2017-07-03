@@ -11,8 +11,10 @@ app.use(cors());
 router.post('/user/register', koaBody, routes.userRegister);
 router.options('/user/register', koaBody, routes.userRegister);
 router.post('/user/login', koaBody, routes.userLogin);
+router.get('/user/logout', koaBody, routes.userLogout)
 router.get('/checkToken', koaBody, routes.checkToken);
 router.get('/getPrivilege', koaBody, routes.getPrivilege);
+router.get('/getUserList', koaBody, routes.getUserList);
 
 app.use(router.routes())
   .use(router.allowedMethods());

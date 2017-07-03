@@ -19,7 +19,7 @@ exports.getToken = function (userId) {
     let secretOrPrivateKey = "zhkj-secret" // 这是加密的key（密钥） 
     let token = jwt.sign(content, secretOrPrivateKey, {
       algorithm: 'HS256', // HS256加密编码
-      expiresIn: 60 * 5 //60 * 60 * 24 // 24小时过期
+      expiresIn: 60 * 10 //60 * 60 * 24 // 24小时过期
     })
 
     return yield Promise.resolve(token);

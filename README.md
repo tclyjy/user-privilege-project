@@ -1,7 +1,16 @@
-# 用户权限管理解决方案
+# 前后端分离下 用户权限管理及用户信息安全解决方案
 
+## 核心： JsonWebToken 、 RESTful API
+
+## 后端
 > 平台：node.js  数据库：mongodb
 > 框架：koa
+
+## 前端
+> 主框架 vue.js
+> Ajax工具 axios
+> 状态管理 vuex
+
 
 ## Run App
 
