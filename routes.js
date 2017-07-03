@@ -125,24 +125,16 @@ exports.checkToken = function (ctx, next) {
 exports.getPrivilege = function (ctx, next) {
   return co(function* () {
 
-    let data = url.parse(ctx.request.url, true).query;
+    let code = yield Token.checkToken(ctx.request.header.authorization);
 
-    let response = yield checkToken(data.token);
-
-    if (response === '0') {
+    if (code.code === '0') {
       let response = {
         'code': '0',
         'msg': 'token已过期'
       };
       ctx.body = response;
-    } else if (response === '2') {
-      let response = {
-        'code': '3',
-        'msg': '该账户不具备该功能权限'
-      };
-      ctx.body = response;
     } else {
-      let privileges = yield Privileges.getPrivileges();
+      let privileges = yield Privileges.findPrivileges(code.roleId, code.userId);
       let response = {
         'code': '1',
         'msg': '验证成功',
